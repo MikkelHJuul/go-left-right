@@ -17,14 +17,14 @@ func newIntMap() *LRMap {
 		right: make(map[int]int),
 	}
 
-	m.LeftRightPrimitive = primitive.New()
+	m.LeftRightPrimitive = primitive.New(m.left, m.right)
 
 	return m
 }
 
 func (lr *LRMap) Get(k int) (val int, exist bool) {
 
-	lr.ApplyReadFn(lr.left, lr.right, func(instance interface{}) {
+	lr.ApplyReadFn(func(instance interface{}) {
 		m := instance.(map[int]int)
 		val, exist = m[k]
 	})
@@ -33,7 +33,7 @@ func (lr *LRMap) Get(k int) (val int, exist bool) {
 }
 
 func (lr *LRMap) Put(key, val int) {
-	lr.ApplyWriteFn(lr.left, lr.right, func(instance interface{}) {
+	lr.ApplyWriteFn(func(instance interface{}) {
 		m := instance.(map[int]int)
 		m[key] = val
 	})
