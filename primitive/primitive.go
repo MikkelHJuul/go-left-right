@@ -1,7 +1,7 @@
 package primitive
 
 import (
-	"runtime"
+	"sync"
 	"sync/atomic"
 )
 
@@ -11,7 +11,7 @@ const ReadOther int32 = 0
 // LeftRightPrimitive provides the basic core of the leftt-right pattern.
 type LeftRightPrimitive struct {
 	// readIndicator is an array of 2 read-indicators, counting the reader numbers on the left/right instance
-	readIndicator *readIndicator
+	lock *RWMutex
 	// readHere represents which instance to read
 	readHere *int32
 	// other is the other instance
@@ -22,13 +22,13 @@ type LeftRightPrimitive struct {
 // New creates a LeftRightPrimitive
 func New(leftData interface{}, rightData interface{}) *LeftRightPrimitive {
 	r := &LeftRightPrimitive{
-		readIndicator: newReadIndicator(),
+		lock:          sync.RWMutex{},
 		readHere:      new(int32),
 		Data:          rightData,
 	}
 
 	l := &LeftRightPrimitive{
-		readIndicator: newReadIndicator(),
+		lock:          sync.RWMutex{},
 		readHere:      new(int32),
 		Data:          leftData,
 		other:         r,
@@ -40,37 +40,34 @@ func New(leftData interface{}, rightData interface{}) *LeftRightPrimitive {
 	return l // starts reading on the left side
 }
 
-func (lr *LeftRightPrimitive) applyWrtRead(fn func(primitive *LeftRightPrimitive)) {
-	read := atomic.LoadInt32(lr.readHere)
-	if read == ReadHere {
-		fn(lr)
-	} else {
-		fn(lr.other)
-	}
-}
-
 // ApplyReadFn applies read operation on the chosen instance, oh, I really need generics, interface type is ugly
 func (lr *LeftRightPrimitive) ApplyReadFn(fn func(interface{})) {
-	lr.applyWrtRead(func(prim *LeftRightPrimitive) {
-		prim.readIndicator.arrive()
-		fn(prim.Data)
-		prim.readIndicator.depart()
-	})
+	read := atomic.LoadInt32(lr.readHere)
+	if read == ReadHere {
+		lr.lock.RLock()
+		fn(lr.Data)
+                lr.lock.RUlock()
+	} else {
+                lr.other.ApplyReadFn(fn)
+        }
 }
 
 // ApplyWriteFn applies write operation on the chosen instance, write operation is done twice, on the left and right
 // instance respectively, this might make writing longer, but the readers are wait-free.
 func (lr *LeftRightPrimitive) ApplyWriteFn(fn func(interface{})) {
-	lr.applyWrtRead(func(prim *LeftRightPrimitive) {
-		fn(prim.other.Data)
-		for !prim.other.readIndicator.isEmpty() {
-			runtime.Gosched()
-		}
-		atomic.StoreInt32(prim.other.readHere, ReadHere)
-		atomic.StoreInt32(prim.readHere, ReadOther)
-		for !prim.readIndicator.isEmpty() {
-			runtime.Gosched()
-		}
-		fn(prim.Data)
-	})
+        read := atomic.LoadInt32(lr.readHere)
+	if read == ReadHere {
+		lr.other.write(fn)
+		atomic.StoreInt32(lr.other.readHere, ReadHere)
+		atomic.StoreInt32(lr.readHere, ReadOther)
+		lr.write(fn)
+	} else {
+                lr.other.ApplyWriteFn(fn)
+        }
+}
+
+func (lr *LeftRightPrimitive) write(fn func(interface{})) {
+        lr.lock.Lock()
+        fn(lr.Data)
+        lr.lock.Unlock()
 }
