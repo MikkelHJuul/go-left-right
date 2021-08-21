@@ -18,16 +18,16 @@ type LeftRightPrimitive struct {
 // New creates a LeftRightPrimitive
 func New(dataInit func() interface{}) *LeftRightPrimitive {
 	r := &LeftRightPrimitive{
-		lock:          sync.RWMutex{},
-		read:     make(chan struct{}),
-		Data:          dataInit(),
+		lock: new(sync.RWMutex),
+		read: make(chan struct{}, 1),
+		Data: dataInit(),
 	}
 
 	l := &LeftRightPrimitive{
-		lock:          sync.RWMutex{},
-		read:     make(chan struct{}),
-		Data:          dataInit(),
-		other:         r,
+		lock:  new(sync.RWMutex),
+		read:  make(chan struct{}, 1),
+		Data:  dataInit(),
+		other: r,
 	}
 
 	r.other = l
@@ -38,10 +38,11 @@ func New(dataInit func() interface{}) *LeftRightPrimitive {
 // ApplyReadFn applies read operation on the chosen instance, oh, I really need generics, interface type is ugly
 func (lr *LeftRightPrimitive) ApplyReadFn(fn func(interface{})) {
 	select {
-	case lr.read <- lr.read:
+	case m := <-lr.read:
+		lr.read <- m
 		lr.lock.RLock()
 		fn(lr.Data)
-		lr.lock.RUlock()
+		lr.lock.RUnlock()
 	default:
 		lr.other.ApplyReadFn(fn)
 	}
@@ -51,11 +52,13 @@ func (lr *LeftRightPrimitive) ApplyReadFn(fn func(interface{})) {
 // instance respectively, this might make writing longer, but the readers are wait-free.
 func (lr *LeftRightPrimitive) ApplyWriteFn(fn func(interface{})) {
 	select {
-	case lr.read <- lr.read:
+	case m := <-lr.read:
+		lr.read <- m
 		lr.other.ApplyWriteFn(fn)
 	default:
 		lr.write(fn)
-		lr.read <- lr.other.read
+		m := <-lr.other.read
+		lr.read <- m
 		lr.other.write(fn)
 	}
 }

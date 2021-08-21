@@ -12,14 +12,9 @@ type LRMap struct {
 
 func newIntMap() *LRMap {
 
-	m := &LRMap{
-		left:  make(map[int]int),
-		right: make(map[int]int),
-	}
-
-	m.LeftRightPrimitive = primitive.New(m.left, m.right)
-
-	return m
+	return &LRMap{LeftRightPrimitive: primitive.New(func() interface{} {
+		return make(map[int]int)
+	})}
 }
 
 func (lr *LRMap) Get(k int) (val int, exist bool) {
