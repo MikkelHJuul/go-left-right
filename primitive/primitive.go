@@ -17,16 +17,15 @@ type LeftRightPrimitive struct {
 
 // New creates a LeftRightPrimitive
 func New(leftData interface{}, rightData interface{}) *LeftRightPrimitive {
-        writeJobs := make(chan func(interface{}))
 	r := &LeftRightPrimitive{
 		lock:          sync.RWMutex{},
-		writeJobs:     writeJobs,
+		writeJobs:     make(chan func(interface{})),
 		Data:          rightData,
 	}
 
 	l := &LeftRightPrimitive{
 		lock:          sync.RWMutex{},
-		writeJobs:     writeJobs,
+		writeJobs:     make(chan func(interface{})),
 		Data:          leftData,
 		other:         r,
 	}
@@ -52,10 +51,10 @@ func (lr *LeftRightPrimitive) ApplyReadFn(fn func(interface{})) {
 // instance respectively, this might make writing longer, but the readers are wait-free.
 func (lr *LeftRightPrimitive) ApplyWriteFn(fn func(interface{})) {
 	select {
-	case wrt := <- writeJobs:
+	case wrt := <- lr.writeJobs:
 		lr.write(wrt)
 		lr.write(fn)
-		writeJobs <- fn
+		lr.other.writeJobs <- fn
 	default:
                 lr.other.write(fn)
         }
