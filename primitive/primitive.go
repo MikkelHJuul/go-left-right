@@ -42,8 +42,7 @@ func New(leftData interface{}, rightData interface{}) *LeftRightPrimitive {
 
 // ApplyReadFn applies read operation on the chosen instance, oh, I really need generics, interface type is ugly
 func (lr *LeftRightPrimitive) ApplyReadFn(fn func(interface{})) {
-	read := atomic.LoadInt32(lr.readHere)
-	if read == ReadHere {
+	if lr.isReader() {
 		lr.lock.RLock()
 		fn(lr.Data)
                 lr.lock.RUlock()
@@ -55,11 +54,10 @@ func (lr *LeftRightPrimitive) ApplyReadFn(fn func(interface{})) {
 // ApplyWriteFn applies write operation on the chosen instance, write operation is done twice, on the left and right
 // instance respectively, this might make writing longer, but the readers are wait-free.
 func (lr *LeftRightPrimitive) ApplyWriteFn(fn func(interface{})) {
-        read := atomic.LoadInt32(lr.readHere)
-	if read == ReadHere {
+	if lr.isReader() {
 		lr.other.write(fn)
-		atomic.StoreInt32(lr.other.readHere, ReadHere)
-		atomic.StoreInt32(lr.readHere, ReadOther)
+		lr.other.startRead()
+                lr.stopRead()
 		lr.write(fn)
 	} else {
                 lr.other.ApplyWriteFn(fn)
@@ -70,4 +68,17 @@ func (lr *LeftRightPrimitive) write(fn func(interface{})) {
         lr.lock.Lock()
         fn(lr.Data)
         lr.lock.Unlock()
+}
+
+func (lr *LeftRightPrimitive) startRead() {
+        atomic.StoreInt32(lr.readHere, ReadHere)
+}
+
+func (lr *LeftRightPrimitive) stopRead() {
+        atomic.StoreInt32(lr.readHere, ReadOther)
+}
+
+func (lr *LeftRightPrimitive) isReader() bool {
+        read := atomic.LoadInt32(lr.readHere)
+	return read == ReadHere
 }
