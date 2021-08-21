@@ -22,16 +22,16 @@ type LeftRightPrimitive struct {
 // New creates a LeftRightPrimitive
 func New(leftData interface{}, rightData interface{}) *LeftRightPrimitive {
 	r := &LeftRightPrimitive{
-		lock:          sync.RWMutex{},
-		readHere:      new(int32),
-		Data:          rightData,
+		lock:     new(sync.RWMutex),
+		readHere: new(int32),
+		Data:     rightData,
 	}
 
 	l := &LeftRightPrimitive{
-		lock:          sync.RWMutex{},
-		readHere:      new(int32),
-		Data:          leftData,
-		other:         r,
+		lock:     new(sync.RWMutex),
+		readHere: new(int32),
+		Data:     leftData,
+		other:    r,
 	}
 
 	*l.readHere = ReadHere
@@ -45,10 +45,10 @@ func (lr *LeftRightPrimitive) ApplyReadFn(fn func(interface{})) {
 	if lr.isReader() {
 		lr.lock.RLock()
 		fn(lr.Data)
-                lr.lock.RUlock()
+		lr.lock.RUnlock()
 	} else {
-                lr.other.ApplyReadFn(fn)
-        }
+		lr.other.ApplyReadFn(fn)
+	}
 }
 
 // ApplyWriteFn applies write operation on the chosen instance, write operation is done twice, on the left and right
@@ -57,28 +57,28 @@ func (lr *LeftRightPrimitive) ApplyWriteFn(fn func(interface{})) {
 	if lr.isReader() {
 		lr.other.write(fn)
 		lr.other.startRead()
-                lr.stopRead()
+		lr.stopRead()
 		lr.write(fn)
 	} else {
-                lr.other.ApplyWriteFn(fn)
-        }
+		lr.other.ApplyWriteFn(fn)
+	}
 }
 
 func (lr *LeftRightPrimitive) write(fn func(interface{})) {
-        lr.lock.Lock()
-        fn(lr.Data)
-        lr.lock.Unlock()
+	lr.lock.Lock()
+	fn(lr.Data)
+	lr.lock.Unlock()
 }
 
 func (lr *LeftRightPrimitive) startRead() {
-        atomic.StoreInt32(lr.readHere, ReadHere)
+	atomic.StoreInt32(lr.readHere, ReadHere)
 }
 
 func (lr *LeftRightPrimitive) stopRead() {
-        atomic.StoreInt32(lr.readHere, ReadOther)
+	atomic.StoreInt32(lr.readHere, ReadOther)
 }
 
 func (lr *LeftRightPrimitive) isReader() bool {
-        read := atomic.LoadInt32(lr.readHere)
+	read := atomic.LoadInt32(lr.readHere)
 	return read == ReadHere
 }
