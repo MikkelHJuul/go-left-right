@@ -11,7 +11,7 @@ const ReadOther int32 = 0
 // LeftRightPrimitive provides the basic core of the leftt-right pattern.
 type LeftRightPrimitive struct {
 	// readIndicator is an array of 2 read-indicators, counting the reader numbers on the left/right instance
-	lock *RWMutex
+	lock *sync.RWMutex
 	// readHere represents which instance to read
 	readHere *int32
 	// other is the other instance
