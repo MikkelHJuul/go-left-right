@@ -16,17 +16,17 @@ type LeftRightPrimitive struct {
 }
 
 // New creates a LeftRightPrimitive
-func New(leftData interface{}, rightData interface{}) *LeftRightPrimitive {
+func New(dataInit func() interface{}) *LeftRightPrimitive {
 	r := &LeftRightPrimitive{
 		lock:          sync.RWMutex{},
-		writeJobs:     make(chan struct{}),
-		Data:          rightData,
+		read:     make(chan struct{}),
+		Data:          dataInit(),
 	}
 
 	l := &LeftRightPrimitive{
 		lock:          sync.RWMutex{},
-		writeJobs:     make(chan struct{}),
-		Data:          leftData,
+		read:     make(chan struct{}),
+		Data:          dataInit(),
 		other:         r,
 	}
 
