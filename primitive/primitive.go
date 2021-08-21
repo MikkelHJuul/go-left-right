@@ -31,6 +31,7 @@ func New(leftData interface{}, rightData interface{}) *LeftRightPrimitive {
 	}
 
 	r.other = l
+	l.read <- struct{}{}
 	return l // starts reading on the left side
 }
 
