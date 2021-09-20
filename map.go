@@ -10,7 +10,7 @@ type LRMap struct {
 func newIntMap() *LRMap {
 
 	m := &LRMap{
-		primitive.NewDefault(func() interface{} {
+		primitive.New(func() interface{} {
 			return make(map[int]int)
 		}),
 	}

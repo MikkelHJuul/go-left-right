@@ -2,13 +2,12 @@ package primitive
 
 import (
 	"sync"
-	"time"
 )
 
 type LeftRight struct {
-	*sync.RWMutex 
-	read   *leftRightPrimitive
-	write  *leftRightPrimitive
+	*sync.RWMutex
+	read  *leftRightPrimitive
+	write *leftRightPrimitive
 }
 
 // leftRightPrimitive provides the basic core of the left-right pattern.
@@ -31,7 +30,7 @@ func (p *leftRightPrimitive) write(writer Writer) {
 }
 
 // New creates a LeftRightPrimitive
-func New(dataInit func() interface{}, confModifers ...func(*config)) *LeftRight {
+func New(dataInit func() interface{}) *LeftRight {
 	r := &leftRightPrimitive{
 		new(sync.RWMutex),
 		dataInit(),
@@ -43,9 +42,10 @@ func New(dataInit func() interface{}, confModifers ...func(*config)) *LeftRight 
 	}
 
 	lr := &LeftRight{
-		make(sync.RWMutex),
-		read:   l,
-		write:  r,
+		RWMutex: new(sync.RWMutex),
+		read:    l,
+		write:   r,
+	}
 	return lr
 }
 
@@ -70,18 +70,18 @@ func (lr *LeftRight) ApplyWriteFn(fn func(interface{})) {
 func (lr *LeftRight) ApplyWriter(fn Writer) {
 	reader, writer := lr.getReader(), lr.getWriter()
 	writer.write(fn)
-	lr.swap()
 	go reader.write(fn)
+	lr.swap()
 }
 
 func (lr *LeftRight) swap() {
 	lr.Lock()
+	defer lr.Unlock()
 	lr.read, lr.write = lr.write, lr.read
-	lr.UnLock()
 }
 
 func (lr *LeftRight) getReader() *leftRightPrimitive {
- 	lr.RLock()
+	lr.RLock()
 	defer lr.RUnlock()
 	return lr.read
 }
